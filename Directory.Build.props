@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Authors>Juan Andres Rodriguez</Authors>
+    <Product>PitWall</Product>
+    <Version>0.1.0</Version>
+    <Copyright>Copyright (c) 2026 Juan Andres Rodriguez</Copyright>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>
+  </PropertyGroup>
+</Project>

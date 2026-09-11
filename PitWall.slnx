@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PitWall.Core/PitWall.Core.csproj" />
+    <Project Path="src/PitWall.Desktop/PitWall.Desktop.csproj" />
+    <Project Path="src/PitWall.Server/PitWall.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PitWall.Core.Tests/PitWall.Core.Tests.csproj" />
+  </Folder>
+</Solution>

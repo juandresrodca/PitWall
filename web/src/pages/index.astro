@@ -1,0 +1,9 @@
+---
+import Base from '../layouts/Base.astro';
+import Dashboard from '../components/Dashboard.svelte';
+---
+
+<Base title="PitWall · Command centre">
+  <noscript>PitWall's dashboard streams live timing and needs JavaScript.</noscript>
+  <Dashboard client:only="svelte" />
+</Base>

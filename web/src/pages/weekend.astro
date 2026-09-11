@@ -1,0 +1,9 @@
+---
+import Base from '../layouts/Base.astro';
+import Weekend from '../components/Weekend.svelte';
+---
+
+<Base title="PitWall · Race weekend" description="Schedule, standings and news for the current Formula 1 weekend">
+  <noscript>The weekend hub loads its data with JavaScript.</noscript>
+  <Weekend client:only="svelte" />
+</Base>

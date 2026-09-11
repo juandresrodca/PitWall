@@ -1,0 +1,32 @@
+# .NET
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+
+# Build output
+dist/
+publish/
+# The Astro build is generated into the server project and embedded at compile time
+src/PitWall.Server/wwwroot/
+
+# Web tooling
+web/node_modules/
+web/.astro/
+
+# Local data, caches and credentials. PitWall keeps these under %LOCALAPPDATA%\PitWall;
+# these patterns stop a stray copy from ever being committed.
+*.token
+desktop.json
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+graphify-out/

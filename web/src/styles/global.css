@@ -1,0 +1,134 @@
+/*
+ * PitWall design tokens.
+ * Juan's base (near-black ground, cyan interaction accent) meets F1 broadcast graphics
+ * (Formula 1 red, slanted tags, timing-screen purple/green/yellow).
+ * Palette lock: red = brand + live state, cyan = interaction/focus/selection. Timing and
+ * tyre colours are functional conventions, never decoration.
+ * Shape lock: panels 6px, controls 4px, tags are 12° parallelograms. Nothing is pill-shaped.
+ */
+:root {
+  color-scheme: dark;
+
+  --bg: #0b0c0f;
+  --panel: #121419;
+  --panel-2: #171a20;
+  --panel-3: #1e222a;
+  --line: #22262e;
+  --line-2: #2d323c;
+
+  --ink: #eceef2;
+  --ink-2: #a4aab6;
+  --ink-3: #6e7584;
+
+  --red: #e10600;
+  --red-ink: #ff4a3f;
+  --cyan: #00b4d8;
+
+  /* Timing screen conventions */
+  --purple: #b36bff;
+  --green: #2bd86f;
+  --yellow: #f5d10a;
+  --pit: #6e7584;
+
+  /* Flags */
+  --flag-yellow: #f5d10a;
+  --flag-red: #e10600;
+  --flag-green: #2bd86f;
+  --flag-sc: #ff9f1c;
+  --flag-blue: #2f8cff;
+
+  /* Pirelli compounds (fixed by convention; always paired with a letter) */
+  --soft: #ff3d3d;
+  --medium: #ffd21f;
+  --hard: #e9ebee;
+  --inter: #35c759;
+  --wet: #2f8cff;
+
+  --font-ui: 'Titillium Web', 'Segoe UI', system-ui, sans-serif;
+  --font-num: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+
+  --r-panel: 6px;
+  --r-ctl: 4px;
+  --skew: -12deg;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+/* The dashboard is sized for a 1920×1080 canvas and scales with the smaller of width or
+   height, so it fills a 1080p TV, a 4K monitor or a 16:10 laptop without scrolling. */
+html {
+  font-size: clamp(10px, min(0.834vw, 1.482vh), 30px);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Film grain: physical texture on a flat ground. Fixed, never inside scrolling content. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  opacity: .028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Scrollbars inside panels: present but quiet. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
