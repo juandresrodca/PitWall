@@ -96,6 +96,12 @@ public sealed class PitWallServer : IAsyncDisposable
         var tracks = app.Services.GetRequiredService<TrackMapService>();
         hub.SessionChanged += path => tracks.Prefetch(path, CurrentCircuit(hub, path));
 
+        // Report sign-in changes straight away, whichever source is running. The live source
+        // follows up with Connected = true once the feed has accepted the token.
+        var tokens = app.Services.GetRequiredService<TokenStore>();
+        hub.UpdateStatus(s => s with { Auth = AuthStatus.Describe(tokens.Current, usingToken: false) });
+        tokens.Changed += token => hub.UpdateStatus(s => s with { Auth = AuthStatus.Describe(token, usingToken: false) });
+
         await app.StartAsync(cancellation);
 
         var sources = app.Services.GetRequiredService<SourceManager>();
@@ -235,6 +241,16 @@ public sealed class PitWallServer : IAsyncDisposable
             return Results.NoContent();
         });
 
+        // Manual sign-in for headless or browser-only setups: the user pastes their own
+        // login-session cookie value (or the bare token). It is sealed, never echoed back.
+        api.MapPost("/auth", (TokenRequest request, TokenStore tokens) =>
+        {
+            var token = tokens.Save(request.Token ?? "");
+            return token is null
+                ? Results.BadRequest(new { error = "That is not a readable F1 TV token or login-session cookie." })
+                : Results.Ok(AuthStatus.Describe(token, usingToken: false));
+        });
+
         api.MapDelete("/auth", (TokenStore tokens) =>
         {
             tokens.Clear();
@@ -297,7 +313,7 @@ public sealed class PitWallServer : IAsyncDisposable
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
         };
         var http = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(2) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("PitWall/0.1 (+https://github.com/juandresrodca/PitWall)");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("PitWall/0.2 (+https://github.com/juandresrodca/PitWall)");
         return http;
     }
 
@@ -344,4 +360,6 @@ public sealed class PitWallServer : IAsyncDisposable
     public sealed record ReplayRequest(string? Path, double? StartAt);
 
     public sealed record ReplayCommand(string Action, double? Value);
+
+    public sealed record TokenRequest(string? Token);
 }

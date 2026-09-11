@@ -3,7 +3,8 @@
     Builds PitWall.exe: the Astro dashboard, the tests, then one self-contained Windows executable.
 
 .EXAMPLE
-    ./scripts/publish.ps1
+    ./scripts/publish.ps1                      # dist\PitWall.exe
+    ./scripts/publish.ps1 -Install             # ...and add it to the Start menu
     ./scripts/publish.ps1 -Runtime win-arm64 -Output dist/arm64
 #>
 [CmdletBinding()]
@@ -11,13 +12,20 @@ param(
     [ValidateSet('win-x64', 'win-arm64')]
     [string] $Runtime = 'win-x64',
     [string] $Output = 'dist',
-    [switch] $SkipTests
+    [switch] $SkipTests,
+    [switch] $Install
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 try {
+    foreach ($tool in 'dotnet', 'npm') {
+        if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
+            throw "$tool was not found. Install the .NET 10 SDK and Node.js 22 (see docs/BUILD.md)."
+        }
+    }
+
     Write-Host '==> Building the dashboard (web/)' -ForegroundColor Cyan
     Push-Location web
     try {
@@ -41,5 +49,12 @@ try {
     $exe = Join-Path $Output 'PitWall.exe'
     $size = [math]::Round((Get-Item $exe).Length / 1MB, 1)
     Write-Host "==> Done: $exe ($size MB)" -ForegroundColor Green
+
+    if ($Install) {
+        & (Join-Path $PSScriptRoot 'install.ps1') -Source $exe
+    }
+    else {
+        Write-Host "Run it:  $exe    (or add it to the Start menu: build.cmd -Install)"
+    }
 }
 finally { Pop-Location }

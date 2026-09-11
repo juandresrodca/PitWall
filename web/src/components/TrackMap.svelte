@@ -2,7 +2,7 @@
   import { feed } from '../lib/feed.svelte';
   import { getJson } from '../lib/api';
   import { drivers, rows, trackState } from '../lib/model';
-  import { inHost, sendHost } from '../lib/host';
+  import { authUi } from '../lib/auth.svelte';
   import type { TrackMap } from '../lib/types';
 
   interface Props {
@@ -139,9 +139,7 @@
     <div class="notice">
       <strong>Live car positions need F1 TV</strong>
       <span>Formula 1 only streams the driver tracker to subscribers.</span>
-      {#if inHost()}
-        <button onclick={() => sendHost('connect-f1tv')}>Connect F1 TV</button>
-      {/if}
+      <button onclick={() => authUi.show('manual')}>Connect F1 TV</button>
     </div>
   {/if}
 

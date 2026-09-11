@@ -201,30 +201,8 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
             })
             .Build();
 
-    private void PublishAuth(bool usingToken, string? problem = null)
-    {
-        var current = tokens.Current;
-        var now = DateTimeOffset.UtcNow;
-        problem ??= current switch
-        {
-            null => null,
-            { IsActive: false } => "The signed-in F1 account has no active F1 TV subscription.",
-            _ when current.IsExpired(now) => "The F1 TV sign-in expired. Sign in again.",
-            _ => null,
-        };
-
-        hub.UpdateStatus(s => s with
-        {
-            Auth = new AuthStatus
-            {
-                Connected = usingToken,
-                Subscription = current?.SubscriptionStatus,
-                Product = current?.Product,
-                Expires = current?.Expires,
-                Problem = problem,
-            },
-        });
-    }
+    private void PublishAuth(bool usingToken, string? problem = null) =>
+        hub.UpdateStatus(s => s with { Auth = AuthStatus.Describe(tokens.Current, usingToken, problem) });
 
     public async ValueTask DisposeAsync() => await StopAsync();
 }

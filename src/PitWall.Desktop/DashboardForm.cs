@@ -44,12 +44,31 @@ internal sealed class DashboardForm : Form
 
     public void Reload() => _view.CoreWebView2?.Reload();
 
-    /// <summary>Tells the page something changed on the host side (e.g. F1 TV sign-in).</summary>
-    public void Notify(string eventName)
+    /// <summary>Tells the page something changed on the host side (e.g. the sign-in pop-up opened).</summary>
+    public void Notify(string eventName, object? detail = null)
     {
         if (_view.CoreWebView2 is { } core)
         {
-            core.PostWebMessageAsJson(JsonSerializer.Serialize(new { @event = eventName }));
+            core.PostWebMessageAsJson(JsonSerializer.Serialize(new { @event = eventName, detail }, JsonSerializerOptions.Web));
+        }
+    }
+
+    /// <summary>
+    /// Forgets the Formula 1 session in PitWall's WebView2 profile, so the next sign-in starts fresh
+    /// instead of silently reusing the old cookie.
+    /// </summary>
+    public async Task ClearFormula1CookiesAsync()
+    {
+        if (_view.CoreWebView2 is not { } core)
+        {
+            return;
+        }
+        foreach (var host in new[] { "https://account.formula1.com", "https://www.formula1.com", "https://f1tv.formula1.com" })
+        {
+            foreach (var cookie in await core.CookieManager.GetCookiesAsync(host))
+            {
+                core.CookieManager.DeleteCookie(cookie);
+            }
         }
     }
 

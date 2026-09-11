@@ -41,9 +41,37 @@ public sealed record ReplayStatus
 
 public sealed record AuthStatus
 {
+    /// <summary>A usable (active, unexpired) F1 TV token is saved.</summary>
+    public bool SignedIn { get; init; }
+
+    /// <summary>The live feed is currently authenticated with that token.</summary>
     public bool Connected { get; init; }
+
     public string? Subscription { get; init; }
     public string? Product { get; init; }
     public DateTimeOffset? Expires { get; init; }
     public string? Problem { get; init; }
+
+    /// <summary>Describes a saved token for the dashboard, never including the token itself.</summary>
+    public static AuthStatus Describe(Core.Auth.F1TvToken? token, bool usingToken, string? problem = null)
+    {
+        var now = DateTimeOffset.UtcNow;
+        problem ??= token switch
+        {
+            null => null,
+            { IsActive: false } => "This Formula 1 account has no active F1 TV subscription.",
+            _ when token.IsExpired(now) => "Your F1 TV sign-in expired. Sign in again.",
+            _ => null,
+        };
+
+        return new AuthStatus
+        {
+            SignedIn = token is { IsActive: true } && !token.IsExpired(now),
+            Connected = usingToken,
+            Subscription = token?.SubscriptionStatus,
+            Product = token?.Product,
+            Expires = token?.Expires,
+            Problem = problem,
+        };
+    }
 }

@@ -17,6 +17,7 @@
   import Championship from './Championship.svelte';
   import NewsTicker from './NewsTicker.svelte';
   import ControlDrawer from './ControlDrawer.svelte';
+  import F1TvConnect from './F1TvConnect.svelte';
 
   let selected = $state<string | null>(null);
   let drawer = $state(false);
@@ -111,6 +112,7 @@
 </div>
 
 <ControlDrawer open={drawer} onClose={() => (drawer = false)} />
+<F1TvConnect />
 
 <style>
   .dash {

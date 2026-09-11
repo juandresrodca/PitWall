@@ -33,6 +33,8 @@ class Feed {
   motion = $state(0);
   status = $state<FeedStatus>({ source: 'Idle', connection: 'Connecting', subscriberData: false, auth: { connected: false } });
   online = $state(false);
+  /** True once the server has sent its first status (the default above is only a placeholder). */
+  statusSeen = $state(false);
   delay = $state(0);
 
   private clock = { utc: Date.now(), at: 0, speed: 1, running: true };
@@ -53,7 +55,10 @@ class Feed {
     es.onopen = () => (this.online = true);
     es.onerror = () => (this.online = false);
 
-    es.addEventListener('status', (e) => (this.status = JSON.parse((e as MessageEvent).data)));
+    es.addEventListener('status', (e) => {
+      this.status = JSON.parse((e as MessageEvent).data);
+      this.statusSeen = true;
+    });
 
     es.addEventListener('snapshot', (e) => {
       const snap = JSON.parse((e as MessageEvent).data);

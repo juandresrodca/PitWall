@@ -3,6 +3,7 @@
   import { command, getJson } from '../lib/api';
   import { inHost, sendHost } from '../lib/host';
   import { mmss } from '../lib/model';
+  import { authUi } from '../lib/auth.svelte';
   import type { ArchiveMeeting } from '../lib/types';
 
   interface Props {
@@ -57,7 +58,7 @@
 
   const authText = $derived.by(() => {
     const a = status.auth;
-    if (a.connected) {
+    if (a.connected || a.signedIn) {
       const until = a.expires ? new Date(a.expires).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
       return `${a.product ?? 'F1 TV'} connected${until ? ` · until ${until}` : ''}`;
     }
@@ -160,14 +161,9 @@
   <section>
     <h3><b>C</b> F1 TV account</h3>
     <p class="hint" class:ok={status.auth.connected}>{authText}</p>
-    {#if host}
-      <div class="row">
-        <button class="primary" onclick={() => sendHost('connect-f1tv')}>{status.auth.connected ? 'Sign in again' : 'Connect F1 TV'}</button>
-        {#if status.auth.subscription}<button onclick={() => sendHost('signout-f1tv')}>Sign out</button>{/if}
-      </div>
-    {:else}
-      <p class="hint">Sign in from PitWall.exe (tray icon → Connect F1 TV account). You type your password on formula1.com itself; PitWall only keeps the subscription token, encrypted for your Windows account.</p>
-    {/if}
+    <button class="primary" onclick={() => { onClose(); authUi.show('manual'); }}>
+      {status.auth.connected || status.auth.signedIn ? 'Manage F1 TV sign-in' : 'Connect F1 TV'}
+    </button>
   </section>
 
   {#if host}

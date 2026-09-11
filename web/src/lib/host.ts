@@ -40,9 +40,10 @@ export function openExternal(url: string): void {
   }
 }
 
-export function onHostEvent(listener: (name: string) => void): void {
+/** Host → page notifications, e.g. `login-opened`, `login-closed` (detail: { result, product, expires }). */
+export function onHostEvent(listener: (name: string, detail?: any) => void): void {
   window.chrome?.webview?.addEventListener('message', (event) => {
-    const name = (event.data as { event?: string })?.event;
-    if (name) listener(name);
+    const data = event.data as { event?: string; detail?: unknown };
+    if (data?.event) listener(data.event, data.detail);
   });
 }

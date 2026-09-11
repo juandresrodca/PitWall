@@ -9,6 +9,7 @@ internal static class Program
 
           PitWall.exe                 dashboard + live video on two screens
           PitWall.exe --setup         choose screens again before starting
+          PitWall.exe --connect       open the F1 TV sign-in pop-up straight away
           PitWall.exe --headless      run only the dashboard server (open it in any browser)
           PitWall.exe --replay PATH   start by replaying an archived session, e.g.
                                       2026/2026-09-06_Italian_Grand_Prix/2026-09-06_Race/
@@ -20,7 +21,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        var options = ParseArgs(args, out var headless, out var setup, out var help);
+        var options = ParseArgs(args, out var headless, out var setup, out var help, out var connect);
         if (help)
         {
             NativeMethods.AttachConsole(NativeMethods.AttachParentProcess);
@@ -39,7 +40,7 @@ internal static class Program
             return 1;
         }
 
-        return headless ? RunHeadless(options) : RunDesktop(options, setup);
+        return headless ? RunHeadless(options) : RunDesktop(options, setup, connect);
     }
 
     private static int RunHeadless(PitWallOptions options)
@@ -60,7 +61,7 @@ internal static class Program
         return 0;
     }
 
-    private static int RunDesktop(PitWallOptions options, bool forceSetup)
+    private static int RunDesktop(PitWallOptions options, bool forceSetup, bool connect)
     {
         ApplicationConfiguration.Initialize();
 
@@ -106,7 +107,7 @@ internal static class Program
 
         try
         {
-            Application.Run(new PitWallContext(server, settings));
+            Application.Run(new PitWallContext(server, settings, connect));
         }
         finally
         {
@@ -115,16 +116,17 @@ internal static class Program
         return 0;
     }
 
-    private static PitWallOptions ParseArgs(string[] args, out bool headless, out bool setup, out bool help)
+    private static PitWallOptions ParseArgs(string[] args, out bool headless, out bool setup, out bool help, out bool connect)
     {
         var options = new PitWallOptions();
-        headless = setup = help = false;
+        headless = setup = help = connect = false;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i].ToLowerInvariant())
             {
                 case "--headless": headless = true; break;
                 case "--setup": setup = true; break;
+                case "--connect": connect = true; break;
                 case "--lan": options.AllowLan = true; break;
                 case "--replay" when i + 1 < args.Length: options.ReplayPath = args[++i]; break;
                 case "--webroot" when i + 1 < args.Length: options.WebRoot = args[++i]; break;

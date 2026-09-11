@@ -60,6 +60,7 @@ Download `PitWall.exe` from the [latest CI build](https://github.com/juandresrod
 ```text
 PitWall.exe                 dashboard + live video on two screens
 PitWall.exe --setup         choose the screens again
+PitWall.exe --connect       open the F1 TV sign-in pop-up straight away
 PitWall.exe --headless      only the dashboard server; open http://127.0.0.1:5320 in any browser
 PitWall.exe --replay PATH   start by replaying an archived session
 PitWall.exe --port N        dashboard port (default 5320)
@@ -111,10 +112,13 @@ flowchart LR
 
 ## Build from source
 
+**Step-by-step guide: [docs/BUILD.md](docs/BUILD.md)** (setup, building, the first launch, troubleshooting).
+
 Requirements: .NET 10 SDK, Node.js 22.19+, Windows 10/11.
 
 ```powershell
-./scripts/publish.ps1            # dashboard build, tests, then dist/PitWall.exe
+.\build.cmd              # dashboard build, tests, then dist\PitWall.exe
+.\build.cmd -Install     # same, then add PitWall to the Start menu
 ```
 
 Or step by step:

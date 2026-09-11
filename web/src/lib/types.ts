@@ -15,6 +15,9 @@ export interface ReplayStatus {
 }
 
 export interface AuthStatus {
+  /** A usable F1 TV token is saved. */
+  signedIn?: boolean;
+  /** The live feed is authenticated with it right now. */
   connected: boolean;
   subscription?: string;
   product?: string;

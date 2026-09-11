@@ -2,6 +2,7 @@
   import { feed } from '../lib/feed.svelte';
   import { mmss, remaining, sessionKind, sessionTitle, trackState, weather } from '../lib/model';
   import { countdown, weekend } from '../lib/weekend.svelte';
+  import { authUi } from '../lib/auth.svelte';
 
   interface Props {
     onMenu: () => void;
@@ -91,9 +92,15 @@
       <span class="chip warn">{status.connection === 'Error' ? 'Offline' : status.connection}</span>
     {/if}
     {#if feed.delay > 0}<span class="chip">+{feed.delay}s</span>{/if}
-    <span class="chip" class:ok={status.auth.connected} title={status.auth.problem ?? ''}>
-      F1 TV {status.auth.connected ? 'on' : 'off'}
-    </span>
+    <button
+      class="chip"
+      class:ok={status.auth.connected || status.auth.signedIn}
+      class:warn={!!status.auth.problem}
+      title={status.auth.problem ?? 'F1 TV account'}
+      onclick={() => authUi.show('manual')}
+    >
+      F1 TV {status.auth.connected || status.auth.signedIn ? 'on' : status.auth.problem ? 'sign in' : 'off'}
+    </button>
   </div>
 
   <button class="menu" onclick={onMenu} aria-label="Open controls (D)">
@@ -241,6 +248,15 @@
     color: var(--ink-2);
     white-space: nowrap;
   }
+
+  button.chip {
+    background: transparent;
+    font-family: inherit;
+    transition: transform .16s var(--ease-out), border-color .15s ease;
+  }
+
+  button.chip:hover { border-color: var(--cyan); }
+  button.chip:active { transform: scale(.97); }
 
   .chip.live { color: #fff; background: var(--red); border-color: var(--red); }
   .chip.replay { color: var(--cyan); border-color: color-mix(in oklab, var(--cyan) 50%, transparent); }

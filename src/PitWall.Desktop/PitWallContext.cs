@@ -14,8 +14,9 @@ internal sealed class PitWallContext : ApplicationContext
     private readonly VideoWindow _video = new();
     private readonly NotifyIcon _tray;
     private DashboardForm? _dashboard;
+    private LoginForm? _login;
 
-    public PitWallContext(PitWallServer server, DesktopSettings settings)
+    public PitWallContext(PitWallServer server, DesktopSettings settings, bool connectOnStart = false)
     {
         _server = server;
         _settings = settings;
@@ -42,6 +43,18 @@ internal sealed class PitWallContext : ApplicationContext
         {
             _ = _video.OpenAsync(_settings);
         }
+
+        if (connectOnStart)
+        {
+            // Give the dashboard page a moment to load, so it hears that the sign-in window opened.
+            var delay = new System.Windows.Forms.Timer { Interval = 2500 };
+            delay.Tick += (_, _) =>
+            {
+                delay.Dispose();
+                ConnectF1Tv();
+            };
+            delay.Start();
+        }
     }
 
     private ContextMenuStrip BuildMenu()
@@ -51,7 +64,7 @@ internal sealed class PitWallContext : ApplicationContext
         menu.Items.Add("Open live video", null, async (_, _) => await OpenVideoAsync());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Connect F1 TV account…", null, (_, _) => ConnectF1Tv());
-        menu.Items.Add("Sign out of F1 TV", null, (_, _) => _server.Tokens.Clear());
+        menu.Items.Add("Sign out of F1 TV", null, async (_, _) => await SignOutAsync());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Swap screens", null, async (_, _) => await SwapScreensAsync());
         menu.Items.Add("Screen setup…", null, async (_, _) => await ScreenSetupAsync());
@@ -84,7 +97,7 @@ internal sealed class PitWallContext : ApplicationContext
                 ConnectF1Tv();
                 break;
             case "signout-f1tv":
-                _server.Tokens.Clear();
+                await SignOutAsync();
                 break;
             case "open-video":
                 await OpenVideoAsync();
@@ -107,10 +120,48 @@ internal sealed class PitWallContext : ApplicationContext
         }
     }
 
+    /// <summary>
+    /// Opens the F1 TV sign-in pop-up over the dashboard. Non-modal, so live timing keeps
+    /// updating behind it; the page is told when it opens and how it ended.
+    /// </summary>
     private void ConnectF1Tv()
     {
-        using var login = new LoginForm(_server.Tokens);
-        login.ShowDialog(_dashboard);
+        if (_login is { IsDisposed: false })
+        {
+            _login.Activate();
+            return;
+        }
+
+        var login = new LoginForm(_server.Tokens) { Owner = _dashboard };
+        login.CenterOn(_dashboard is { IsDisposed: false } ? Screen.FromControl(_dashboard) : _settings.DashboardScreen);
+        login.FormClosed += (_, _) =>
+        {
+            _login = null;
+            _dashboard?.Notify("login-closed", new
+            {
+                result = login.Result switch
+                {
+                    LoginResult.Connected => "connected",
+                    LoginResult.NoSubscription => "no-subscription",
+                    _ => "cancelled",
+                },
+                product = login.Token?.Product,
+                expires = login.Token?.Expires,
+            });
+            login.Dispose();
+        };
+        _login = login;
+        login.Show();
+        _dashboard?.Notify("login-opened");
+    }
+
+    private async Task SignOutAsync()
+    {
+        _server.Tokens.Clear();
+        if (_dashboard is { IsDisposed: false })
+        {
+            await _dashboard.ClearFormula1CookiesAsync();
+        }
     }
 
     private async Task OpenVideoAsync()
