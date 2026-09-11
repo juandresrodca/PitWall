@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using PitWall.Core.Json;
 using PitWall.Core.LiveTiming;
 using PitWall.Server.Auth;
 
@@ -116,8 +117,10 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
             {
                 await connection.StartAsync(cancellation);
                 var snapshot = await connection.InvokeAsync<JsonObject>("Subscribe", Topics.Subscribed, cancellation);
+                // Record the session before loading it: Load announces it, and that must not
+                // look like a session change that needs yet another resubscribe.
+                _loadedPath = snapshot[Topics.SessionInfo]?["Path"].AsString();
                 hub.Load(snapshot);
-                _loadedPath = hub.Read(s => s.SessionPath);
                 attempt = 0;
 
                 hub.UpdateStatus(s => s with { Connection = FeedConnection.Connected, Message = token is null ? "Public timing feed" : "F1 TV timing feed" });

@@ -10,6 +10,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
+using PitWall.Core.Json;
 using PitWall.Server.Archive;
 using PitWall.Server.Auth;
 using PitWall.Server.Feed;
@@ -93,7 +94,7 @@ public sealed class PitWallServer : IAsyncDisposable
 
         var hub = app.Services.GetRequiredService<FeedHub>();
         var tracks = app.Services.GetRequiredService<TrackMapService>();
-        hub.SessionChanged += tracks.Prefetch;
+        hub.SessionChanged += path => tracks.Prefetch(path, CurrentCircuit(hub, path));
 
         await app.StartAsync(cancellation);
 
@@ -164,7 +165,7 @@ public sealed class PitWallServer : IAsyncDisposable
             {
                 return Results.NoContent();
             }
-            var map = await tracks.GetForSessionAsync(path, ct);
+            var map = await tracks.GetForSessionAsync(path, CurrentCircuit(hub, path), ct);
             return map is null ? Results.NoContent() : Results.Ok(map);
         });
 
@@ -240,6 +241,12 @@ public sealed class PitWallServer : IAsyncDisposable
             return Results.NoContent();
         });
     }
+
+    /// <summary>Circuit key from the feed's SessionInfo, if <paramref name="path"/> is the session being shown.</summary>
+    private static int CurrentCircuit(FeedHub hub, string? path) => hub.Read(state =>
+        path is not null && state.SessionPath == path
+            ? state.Topic(Core.LiveTiming.Topics.SessionInfo)?["Meeting"]?["Circuit"]?["Key"].AsInt() ?? 0
+            : 0);
 
     private static void UseDashboardFiles(WebApplication app, PitWallOptions options)
     {

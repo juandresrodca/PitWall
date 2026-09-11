@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# A newer push supersedes a run still waiting for a runner.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest

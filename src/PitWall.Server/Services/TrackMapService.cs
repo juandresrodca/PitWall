@@ -17,27 +17,37 @@ public sealed class TrackMapService(ArchiveClient archive, PitWallOptions option
 {
     private readonly ConcurrentDictionary<int, Lazy<Task<TrackMap?>>> _byCircuit = new();
 
-    public async Task<TrackMap?> GetForSessionAsync(string sessionPath, CancellationToken cancellation)
+    /// <param name="circuitKey">
+    /// The circuit from the feed's own SessionInfo when known. A live session is not in the
+    /// archive index until it has been archived, so looking it up by path would fail mid-session.
+    /// </param>
+    public async Task<TrackMap?> GetForSessionAsync(string sessionPath, int circuitKey, CancellationToken cancellation)
     {
-        var session = await archive.FindSessionAsync(sessionPath, cancellation);
-        if (session is null || session.CircuitKey == 0)
+        if (!int.TryParse(sessionPath.Split('/')[0], out var year))
+        {
+            return null;
+        }
+        if (circuitKey == 0)
+        {
+            circuitKey = (await archive.FindSessionAsync(sessionPath, cancellation))?.CircuitKey ?? 0;
+        }
+        if (circuitKey == 0)
         {
             return null;
         }
 
-        var lazy = _byCircuit.GetOrAdd(session.CircuitKey,
-            key => new Lazy<Task<TrackMap?>>(() => BuildAsync(key, session)));
+        var lazy = _byCircuit.GetOrAdd(circuitKey, key => new Lazy<Task<TrackMap?>>(() => BuildAsync(key, year)));
         var map = await lazy.Value;
         if (map is null)
         {
             // Let a later request retry, e.g. once the first session at a new circuit is archived.
-            _byCircuit.TryRemove(session.CircuitKey, out _);
+            _byCircuit.TryRemove(circuitKey, out _);
         }
         return map;
     }
 
     /// <summary>Warms the cache in the background so the map is ready when the dashboard asks.</summary>
-    public void Prefetch(string? sessionPath)
+    public void Prefetch(string? sessionPath, int circuitKey)
     {
         if (sessionPath is null)
         {
@@ -47,7 +57,7 @@ public sealed class TrackMapService(ArchiveClient archive, PitWallOptions option
         {
             try
             {
-                await GetForSessionAsync(sessionPath, CancellationToken.None);
+                await GetForSessionAsync(sessionPath, circuitKey, CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -56,7 +66,7 @@ public sealed class TrackMapService(ArchiveClient archive, PitWallOptions option
         });
     }
 
-    private async Task<TrackMap?> BuildAsync(int circuitKey, ArchiveSession requested)
+    private async Task<TrackMap?> BuildAsync(int circuitKey, int year)
     {
         var cacheFile = Path.Combine(options.DataDirectory, "tracks", $"{circuitKey}.json");
         if (File.Exists(cacheFile))
@@ -72,7 +82,6 @@ public sealed class TrackMapService(ArchiveClient archive, PitWallOptions option
         }
 
         var now = DateTimeOffset.UtcNow;
-        var year = requested.StartUtc.Year;
         var candidates = new List<ArchiveSession>();
         foreach (var y in new[] { year, year - 1, year - 2 })
         {
