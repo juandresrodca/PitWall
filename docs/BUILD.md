@@ -89,6 +89,7 @@ Windows may show **"Windows protected your PC"** the first time, because the exe
 | Rewatch a past session | `D` → pick season, Grand Prix and session → *Replay this session* |
 | Follow one driver | Click their row or their car |
 | Open the weekend schedule and news | `W` |
+| Install a new version | Tray icon → **Check for updates…** (or `D` → *Software update*) |
 | Quit | Tray icon (next to the clock) → **Exit PitWall** |
 
 ## 6. Troubleshooting
@@ -103,6 +104,8 @@ Windows may show **"Windows protected your PC"** the first time, because the exe
 | Sign-in pop-up says *no subscription* | Formula 1 only issues the token to F1 TV Access/Pro accounts, and since 15 Oct 2026 live timing needs one. |
 | *Live timing needs an F1 TV sign-in* | Your token expired (they last about a week). Open the pop-up and sign in again. |
 | *Formula 1 is refusing this network* | Their CDN blocks VPNs, datacentres and some mobile hotspots. Use a normal home connection. |
+| Update says *not available here* | You are running a development build, not a released `PitWall.exe`. |
+| Update cannot write the file | Move `PitWall.exe` somewhere your account owns, such as `%LOCALAPPDATA%\Programs\PitWall` (`scripts\install.ps1` does this). |
 | Port 5320 in use | PitWall picks the next free port automatically; for `--headless`, pass `--port`. |
 
 Settings, caches and the sealed F1 TV token live in `%LOCALAPPDATA%\PitWall`. Sign out from the pop-up or the

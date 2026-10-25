@@ -16,40 +16,66 @@ public sealed record TrackMap(int CircuitKey, string BuiltFrom, int[][] Points, 
 public sealed class TrackMapService(ArchiveClient archive, PitWallOptions options, ILogger<TrackMapService> logger)
 {
     private readonly ConcurrentDictionary<int, Lazy<Task<TrackMap?>>> _byCircuit = new();
+    private readonly ConcurrentDictionary<int, DateTimeOffset> _retryAfter = new();
 
+    /// <summary>How long to wait before rebuilding a circuit whose outline could not be made.</summary>
+    private static readonly TimeSpan FailureCooldown = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// The finished outline, or null with <paramref name="building"/> set while one is being
+    /// made. The first build of a circuit downloads a whole session's positions and can take
+    /// minutes, so this never holds the request open: callers poll instead.
+    /// </summary>
     /// <param name="circuitKey">
     /// The circuit from the feed's own SessionInfo when known. A live session is not in the
     /// archive index until it has been archived, so looking it up by path would fail mid-session.
     /// </param>
-    public async Task<TrackMap?> GetForSessionAsync(string sessionPath, int circuitKey, CancellationToken cancellation)
+    public TrackMap? TryGet(string sessionPath, int circuitKey, out bool building)
     {
+        building = false;
         if (!int.TryParse(sessionPath.Split('/')[0], out var year))
         {
             return null;
         }
+
         if (circuitKey == 0)
         {
-            circuitKey = (await archive.FindSessionAsync(sessionPath, cancellation))?.CircuitKey ?? 0;
-        }
-        if (circuitKey == 0)
-        {
+            // Resolving it needs the archive index; fetch that in the background and let the
+            // caller poll, rather than blocking on the network inside a request.
+            building = true;
+            StartResolve(sessionPath, year);
             return null;
         }
 
-        var lazy = _byCircuit.GetOrAdd(circuitKey, key => new Lazy<Task<TrackMap?>>(() => BuildAsync(key, year)));
-        var map = await lazy.Value;
-        if (map is null)
+        if (_retryAfter.TryGetValue(circuitKey, out var until) && until > DateTimeOffset.UtcNow)
         {
-            // Let a later request retry, e.g. once the first session at a new circuit is archived.
-            _byCircuit.TryRemove(circuitKey, out _);
+            return null; // Tried recently and there was nothing to build from.
         }
-        return map;
+
+        var task = _byCircuit.GetOrAdd(circuitKey, key => new Lazy<Task<TrackMap?>>(() => BuildAsync(key, year))).Value;
+        if (!task.IsCompleted)
+        {
+            building = true;
+            return null;
+        }
+
+        if (task.IsCompletedSuccessfully && task.Result is { } map)
+        {
+            return map;
+        }
+
+        // Nothing to build from (a brand-new circuit, or the archive refused us). Try again
+        // later — a session gets archived a few hours after it runs — but not on every poll.
+        _byCircuit.TryRemove(circuitKey, out _);
+        _retryAfter[circuitKey] = DateTimeOffset.UtcNow + FailureCooldown;
+        return null;
     }
 
-    /// <summary>Warms the cache in the background so the map is ready when the dashboard asks.</summary>
-    public void Prefetch(string? sessionPath, int circuitKey)
+    private readonly ConcurrentDictionary<string, byte> _resolving = new();
+
+    private void StartResolve(string sessionPath, int year)
     {
-        if (sessionPath is null)
+        if (!_resolving.TryAdd(sessionPath, 0))
         {
             return;
         }
@@ -57,13 +83,30 @@ public sealed class TrackMapService(ArchiveClient archive, PitWallOptions option
         {
             try
             {
-                await GetForSessionAsync(sessionPath, circuitKey, CancellationToken.None);
+                var key = (await archive.FindSessionAsync(sessionPath, CancellationToken.None))?.CircuitKey ?? 0;
+                if (key != 0)
+                {
+                    _ = _byCircuit.GetOrAdd(key, k => new Lazy<Task<TrackMap?>>(() => BuildAsync(k, year))).Value;
+                }
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Track map prefetch failed for {Path}", sessionPath);
+                logger.LogWarning(ex, "Could not resolve the circuit for {Path}", sessionPath);
+            }
+            finally
+            {
+                _resolving.TryRemove(sessionPath, out _);
             }
         });
+    }
+
+    /// <summary>Warms the cache in the background so the map is ready when the dashboard asks.</summary>
+    public void Prefetch(string? sessionPath, int circuitKey)
+    {
+        if (sessionPath is not null)
+        {
+            TryGet(sessionPath, circuitKey, out _);
+        }
     }
 
     private async Task<TrackMap?> BuildAsync(int circuitKey, int year)

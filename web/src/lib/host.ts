@@ -22,6 +22,7 @@ export type HostCommand =
   | 'swap-screens'
   | 'screen-setup'
   | 'fullscreen'
+  | 'check-updates'
   | 'reload'
   | 'quit';
 

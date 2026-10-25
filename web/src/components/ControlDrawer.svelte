@@ -1,10 +1,10 @@
 <script lang="ts">
   import { feed } from '../lib/feed.svelte';
   import { command, getJson } from '../lib/api';
-  import { inHost, sendHost } from '../lib/host';
+  import { inHost, openExternal, sendHost } from '../lib/host';
   import { mmss } from '../lib/model';
   import { authUi } from '../lib/auth.svelte';
-  import type { ArchiveMeeting } from '../lib/types';
+  import type { ArchiveMeeting, UpdateStatus } from '../lib/types';
 
   interface Props {
     open: boolean;
@@ -55,6 +55,46 @@
   function onKey(e: KeyboardEvent) {
     if (open && e.key === 'Escape') onClose();
   }
+
+  let update = $state<UpdateStatus | null>(null);
+  let busy = $state(false);
+
+  // The drawer is the only place this is shown, so only poll while it is open.
+  $effect(() => {
+    if (!open) return;
+    const load = async () => (update = await getJson<UpdateStatus>('/api/update'));
+    load();
+    const timer = setInterval(load, 2000);
+    return () => clearInterval(timer);
+  });
+
+  async function check() {
+    busy = true;
+    update = await getJson<UpdateStatus>('/api/update?check=true');
+    busy = false;
+  }
+
+  async function download() {
+    busy = true;
+    await command('/api/update/download');
+    update = await getJson<UpdateStatus>('/api/update');
+    busy = false;
+  }
+
+  const updateText = $derived.by(() => {
+    const u = update;
+    if (!u) return 'Checking…';
+    switch (u.state) {
+      case 'Available': return `PitWall ${u.latest} is available. You have ${u.current}.`;
+      case 'Downloading': return `Downloading ${u.latest}… ${u.progress}%`;
+      case 'Ready': return `PitWall ${u.latest} is downloaded and verified. Installing restarts PitWall.`;
+      case 'UpToDate': return `You have ${u.current}, the newest release.`;
+      case 'Checking': return 'Checking GitHub for a newer release…';
+      case 'NotSupported': return u.error ?? 'This build cannot update itself.';
+      case 'Failed': return u.error ?? 'Could not check for updates.';
+      default: return `You have ${u.current}.`;
+    }
+  });
 
   const authText = $derived.by(() => {
     const a = status.auth;
@@ -178,6 +218,34 @@
     </section>
   {/if}
 
+  <section>
+    <h3><b>{host ? 'E' : 'D'}</b> Software update</h3>
+    <p class="hint" class:ok={update?.state === 'Ready'}>{updateText}</p>
+    {#if update?.state === 'Downloading'}
+      <div class="bar" role="progressbar" aria-valuenow={update.progress} aria-valuemin="0" aria-valuemax="100">
+        <span style:width="{update.progress}%"></span>
+      </div>
+    {/if}
+    <div class="row wrap">
+      {#if update?.state === 'Available'}
+        <button class="primary" onclick={download} disabled={busy}>Download {update.latest}</button>
+      {:else if update?.state === 'Ready'}
+        {#if host}
+          <button class="primary" onclick={() => sendHost('check-updates')}>Install and restart</button>
+        {:else}
+          <span class="hint">Install it from the PitWall window: tray icon → Check for updates…</span>
+        {/if}
+      {:else}
+        <button onclick={check} disabled={busy || update?.state === 'Checking'}>
+          {update?.state === 'Checking' ? 'Checking…' : 'Check for updates'}
+        </button>
+      {/if}
+      {#if update?.releaseUrl}
+        <button onclick={() => openExternal(update.releaseUrl!)}>Release notes</button>
+      {/if}
+    </div>
+  </section>
+
   <footer>
     <a href="/weekend">Weekend hub →</a>
     <span class="hint">Keys: D controls · W weekend · Space play/pause · ← → seek</span>
@@ -233,6 +301,21 @@
   section { padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
 
   .hint { margin: .35rem 0; font-size: .8rem; color: var(--ink-3); }
+
+  .bar {
+    height: 4px;
+    margin: .5rem 0;
+    background: var(--panel-3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .bar span {
+    display: block;
+    height: 100%;
+    background: var(--cyan);
+    transition: width .3s var(--ease-out);
+  }
   .hint.ok { color: var(--green); }
 
   button {

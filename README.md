@@ -110,6 +110,23 @@ flowchart LR
 
 **Track maps** are built from the cars' own GPS traces: PitWall finds one clean lap in an archived session at that circuit and resamples it. There is no third-party map data, and new circuits (like the Madring) work once one practice session is archived.
 
+## Updating
+
+PitWall updates itself from this repository's releases: **tray icon → Check for updates…**, or the
+controls drawer (`D`) → **Software update**. It shows what changed, downloads `PitWall.exe`, checks
+it against the `SHA256SUMS.txt` published with the release, and installs it when you restart.
+Nothing is downloaded or replaced unless you ask for it, and a download that fails its checksum is
+thrown away.
+
+To cut a release: bump `<Version>` in `Directory.Build.props`, add a `CHANGELOG.md` section, then
+
+```powershell
+git tag v0.2.2 && git push origin v0.2.2
+```
+
+The release workflow builds the dashboard, runs the tests, publishes the exe and attaches it with
+its checksum. The tag and `<Version>` must match, or the workflow stops.
+
 ## Build from source
 
 **Step-by-step guide: [docs/BUILD.md](docs/BUILD.md)** (setup, building, the first launch, troubleshooting).

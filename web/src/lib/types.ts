@@ -136,3 +136,17 @@ export interface Forecast {
   };
   weekend?: { name: string; locality: string; country: string };
 }
+
+export type UpdateState =
+  | 'Unknown' | 'Checking' | 'UpToDate' | 'Available' | 'Downloading' | 'Ready' | 'Failed' | 'NotSupported';
+
+export interface UpdateStatus {
+  current: string;
+  latest?: string;
+  notes?: string;
+  published?: string;
+  releaseUrl?: string;
+  state: UpdateState;
+  progress: number;
+  error?: string;
+}

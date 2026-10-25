@@ -1,0 +1,99 @@
+name: Release
+
+# Publishes PitWall.exe for a version tag, e.g.
+#   git tag v0.2.2 && git push origin v0.2.2
+# The in-app updater reads the latest release of this repository, downloads PitWall.exe and
+# checks it against SHA256SUMS.txt, so both assets must be present for an update to install.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build a release from (e.g. v0.2.2)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read the version
+        id: version
+        shell: bash
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          project=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          if [ "$version" != "$project" ]; then
+            echo "::error::Tag $tag does not match <Version>$project</Version> in Directory.Build.props."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build dashboard
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Test
+        run: dotnet test --project tests/PitWall.Core.Tests -c Release
+
+      - name: Publish PitWall.exe
+        run: dotnet publish src/PitWall.Desktop -c Release -r win-x64 -o dist
+
+      - name: Checksum
+        shell: pwsh
+        working-directory: dist
+        run: |
+          $hash = (Get-FileHash PitWall.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  PitWall.exe" | Set-Content SHA256SUMS.txt -Encoding ascii
+          Get-Content SHA256SUMS.txt
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          tag="${{ steps.version.outputs.tag }}"
+
+          # This version's changelog section, if it has one.
+          awk -v v="## $version" '
+            $0 ~ "^"v {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "PitWall $version." > notes.md
+
+          cat >> notes.md <<'NOTES'
+
+          ### Install
+
+          Download `PitWall.exe` below and run it. Already running PitWall? Use the tray icon →
+          **Check for updates…**, or the controls drawer (`D`) → **Software update**.
+
+          Windows may warn that the publisher is unknown, because the exe is not code-signed:
+          choose **More info → Run anyway**. To verify the download yourself:
+          `Get-FileHash PitWall.exe -Algorithm SHA256` and compare with `SHA256SUMS.txt`.
+          NOTES
+
+          gh release create "$tag" --title "PitWall $version" --notes-file notes.md --repo "$GITHUB_REPOSITORY" dist/PitWall.exe dist/SHA256SUMS.txt

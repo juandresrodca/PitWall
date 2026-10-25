@@ -15,6 +15,7 @@ internal sealed class PitWallContext : ApplicationContext
     private readonly NotifyIcon _tray;
     private DashboardForm? _dashboard;
     private LoginForm? _login;
+    private UpdateDialog? _updateDialog;
 
     public PitWallContext(PitWallServer server, DesktopSettings settings, bool connectOnStart = false)
     {
@@ -69,6 +70,7 @@ internal sealed class PitWallContext : ApplicationContext
         menu.Items.Add("Swap screens", null, async (_, _) => await SwapScreensAsync());
         menu.Items.Add("Screen setup…", null, async (_, _) => await ScreenSetupAsync());
         menu.Items.Add("Open dashboard in browser", null, (_, _) => WebViewHost.OpenExternal(_server.Url));
+        menu.Items.Add("Check for updates…", null, (_, _) => ShowUpdates());
         menu.Items.Add("Open data folder", null, (_, _) =>
             Process.Start(new ProcessStartInfo(PitWallOptions.DefaultDataDirectory) { UseShellExecute = true }));
         menu.Items.Add(new ToolStripSeparator());
@@ -110,6 +112,9 @@ internal sealed class PitWallContext : ApplicationContext
                 break;
             case "open-external" when message.TryGetProperty("url", out var url):
                 WebViewHost.OpenExternal(url.GetString() ?? "");
+                break;
+            case "check-updates":
+                ShowUpdates();
                 break;
             case "reload":
                 _dashboard?.Reload();
@@ -153,6 +158,29 @@ internal sealed class PitWallContext : ApplicationContext
         _login = login;
         login.Show();
         _dashboard?.Notify("login-opened");
+    }
+
+    /// <summary>
+    /// Opens the update dialog. Installing replaces PitWall.exe, so it can only happen with
+    /// PitWall closed: the dialog starts the swap and we exit, and the installer reopens us.
+    /// </summary>
+    private void ShowUpdates()
+    {
+        if (_updateDialog is { IsDisposed: false })
+        {
+            _updateDialog.Activate();
+            return;
+        }
+
+        using var dialog = new UpdateDialog(_server.Updates);
+        _updateDialog = dialog;
+        dialog.ShowDialog(_dashboard);
+        _updateDialog = null;
+
+        if (dialog.Installing)
+        {
+            ExitThread();
+        }
     }
 
     private async Task SignOutAsync()

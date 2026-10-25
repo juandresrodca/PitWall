@@ -1,6 +1,5 @@
 <script lang="ts">
   import { feed } from '../lib/feed.svelte';
-  import { getJson } from '../lib/api';
   import { drivers, rows, trackState } from '../lib/model';
   import { authUi } from '../lib/auth.svelte';
   import type { TrackMap } from '../lib/types';
@@ -14,22 +13,58 @@
 
   let box = $state({ w: 0, h: 0 });
   let map = $state<TrackMap | null>(null);
-  let loadedFor = '';
+  /** 'building' while the server is making the outline, 'none' when it has nothing to build from. */
+  let mapState = $state<'building' | 'none'>('building');
 
-  // Fetch the outline whenever the session changes.
+  /**
+   * Poll for the outline until it arrives, and keep polling afterwards only if it never does.
+   *
+   * The first build of a circuit downloads a whole archived session, which can take minutes —
+   * longer than a visit to the page. An earlier version gave up after 30 seconds and the panel
+   * then stayed empty for the rest of the session, even once the server had the map.
+   */
   $effect(() => {
     const path = feed.status.sessionPath ?? '';
-    if (!path || path === loadedFor) return;
-    loadedFor = path;
+    if (!path) {
+      map = null;
+      return;
+    }
+
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let waited = 0;
     map = null;
-    let attempts = 0;
+    mapState = 'building';
+
     const load = async () => {
-      const result = await getJson<TrackMap>(`/api/track?path=${encodeURIComponent(path)}`);
-      if (loadedFor !== path) return;
-      if (result) map = result;
-      else if (++attempts < 6) setTimeout(load, 5000); // the server may still be building it
+      if (stopped) return;
+      let status = 0;
+      try {
+        const response = await fetch(`/api/track?path=${encodeURIComponent(path)}`);
+        status = response.status;
+        if (status === 200) {
+          const result = (await response.json()) as TrackMap;
+          if (!stopped) map = result;
+          return; // Outlines never change, so stop asking.
+        }
+      } catch {
+        status = 0; // Server not reachable yet; treat it as "still coming".
+      }
+      if (stopped) return;
+
+      mapState = status === 204 ? 'none' : 'building';
+      // Eager while a build is plausible, then slow: 'none' only changes when F1 archives a
+      // session at a new circuit, which is hours away.
+      const next = mapState === 'none' ? 60_000 : waited < 120_000 ? 4_000 : 15_000;
+      waited += next;
+      timer = setTimeout(load, next);
     };
+
     load();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
   });
 
   /**
@@ -131,7 +166,11 @@
     </svg>
   {:else}
     <p class="placeholder">
-      {feed.status.sessionPath ? 'Drawing the circuit from archived car positions…' : 'The circuit appears once a session is loaded.'}
+      {!feed.status.sessionPath
+        ? 'The circuit appears once a session is loaded.'
+        : mapState === 'building'
+          ? 'Drawing the circuit from archived car positions…'
+          : 'No outline for this circuit yet. Formula 1 archives a session a few hours after it runs; PitWall keeps checking.'}
     </p>
   {/if}
 

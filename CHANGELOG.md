@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.2 — 2026-10-25
+
+- **The track map no longer gets stuck empty.** The dashboard gave up asking for the circuit
+  outline after 30 seconds, but the first build of a circuit downloads a whole archived session
+  and can take longer — after that the panel stayed on "Drawing the circuit…" for the rest of the
+  session even once the server had it. It now keeps asking (quickly at first, then slowly), and
+  the server answers 202 while it is building and 204 when there is nothing to build from, so the
+  panel can say which. The request no longer blocks while a build runs.
+- **Update from GitHub releases.** Tray icon → *Check for updates…*, or the controls drawer
+  (`D`) → *Software update*. PitWall checks its own releases, shows what is new, downloads the
+  exe, verifies it against the release's `SHA256SUMS.txt`, and installs it on restart. Nothing is
+  downloaded or replaced without being asked; a failed checksum is discarded.
+- Releases are published by tagging `vX.Y.Z`, with the exe and its checksum attached.
+
 ## 0.2.1 — 2026-10-25
 
 Formula 1 put live timing and the session archive behind the F1 TV paywall on 15 October 2026.

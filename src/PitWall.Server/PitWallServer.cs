@@ -39,6 +39,8 @@ public sealed class PitWallServer : IAsyncDisposable
 
     public TokenStore Tokens => _app.Services.GetRequiredService<TokenStore>();
 
+    public UpdateService Updates => _app.Services.GetRequiredService<UpdateService>();
+
     public static async Task<PitWallServer> StartAsync(PitWallOptions options, Action<ILoggingBuilder>? logging = null, CancellationToken cancellation = default)
     {
         Directory.CreateDirectory(options.DataDirectory);
@@ -86,6 +88,7 @@ public sealed class PitWallServer : IAsyncDisposable
         builder.Services.AddSingleton<ScheduleService>();
         builder.Services.AddSingleton<NewsService>();
         builder.Services.AddSingleton<ForecastService>();
+        builder.Services.AddSingleton<UpdateService>();
 
         var app = builder.Build();
 
@@ -103,6 +106,9 @@ public sealed class PitWallServer : IAsyncDisposable
         tokens.Changed += token => hub.UpdateStatus(s => s with { Auth = AuthStatus.Describe(token, usingToken: false) });
 
         await app.StartAsync(cancellation);
+
+        var updates = app.Services.GetRequiredService<UpdateService>();
+        _ = Task.Run(() => updates.CheckAsync(force: false, CancellationToken.None));
 
         var sources = app.Services.GetRequiredService<SourceManager>();
         if (options.ReplayPath is { } replayPath)
@@ -164,15 +170,18 @@ public sealed class PitWallServer : IAsyncDisposable
             return body is null ? Results.NoContent() : Results.Text(body.ToJsonString(), "application/json");
         });
 
-        api.MapGet("/track", async (string? path, FeedHub hub, TrackMapService tracks, CancellationToken ct) =>
+        // 200 the outline · 202 still being built (poll again) · 204 nothing to build it from.
+        api.MapGet("/track", (string? path, FeedHub hub, TrackMapService tracks) =>
         {
             path ??= hub.Status.SessionPath;
             if (path is null || !SourceManager.SessionPathPattern().IsMatch(path))
             {
                 return Results.NoContent();
             }
-            var map = await tracks.GetForSessionAsync(path, CurrentCircuit(hub, path), ct);
-            return map is null ? Results.NoContent() : Results.Ok(map);
+            var map = tracks.TryGet(path, CurrentCircuit(hub, path), out var building);
+            return map is not null ? Results.Ok(map)
+                : building ? Results.StatusCode(StatusCodes.Status202Accepted)
+                : Results.NoContent();
         });
 
         api.MapGet("/archive/{year:int}", async (int year, ArchiveClient archive, CancellationToken ct) =>
@@ -250,6 +259,13 @@ public sealed class PitWallServer : IAsyncDisposable
                 ? Results.BadRequest(new { error = "That is not a readable F1 TV token or login-session cookie." })
                 : Results.Ok(AuthStatus.Describe(token, usingToken: false));
         });
+
+        api.MapGet("/update", async (UpdateService updates, bool? check, CancellationToken ct) =>
+            Results.Ok(check == true ? await updates.CheckAsync(force: true, ct) : updates.Status));
+
+        // Downloads and verifies the release; installing it is a separate, deliberate step.
+        api.MapPost("/update/download", async (UpdateService updates, CancellationToken ct) =>
+            Results.Ok(await updates.DownloadAsync(ct)));
 
         api.MapDelete("/auth", (TokenStore tokens) =>
         {
