@@ -137,7 +137,6 @@ For frontend work, run `PitWall.exe --headless` and `npm run dev` in `web/`. Ast
 - **Calendar and standings**: [Jolpica F1 API](https://github.com/jolpica/jolpica-f1), the community successor to Ergast.
 - **Forecast**: [Open-Meteo](https://open-meteo.com/), free for non-commercial use.
 - **News**: the public RSS feeds of Formula 1, Autosport, Motorsport.com, BBC Sport and RaceFans. Headlines link to the publisher.
-- **Inspiration**: [f1-dash](https://github.com/slowlydev/f1-dash) by slowlydev showed what a live-timing dashboard can be. PitWall is an independent implementation (C#/.NET and Astro, written from scratch); no code was copied.
 - Fonts: Titillium Web and JetBrains Mono (SIL Open Font License).
 
 ## Disclaimer
