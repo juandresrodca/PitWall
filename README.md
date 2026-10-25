@@ -44,12 +44,12 @@ After that it goes straight to both screens. The tray icon has **Swap screens**,
 
 ## F1 TV account
 
-Formula 1's public timing feed carries the timing tower, race control, radio and weather. Since the 2025 Dutch GP, **car positions, telemetry, the championship projection and pit-lane times are served only to F1 TV subscribers.** Connecting your account unlocks them:
+**Since 15 October 2026 an F1 TV subscription is required for live timing and for the session archive.** Formula 1 answers 401 to everything else, so PitWall needs a connected account to show a live session, download a past one, or build a track map. (Before that date the timing tower was public and only car positions, telemetry, the championship projection and pit-lane times needed a subscription.)
 
 1. Tray icon → **Connect F1 TV account…** (or the button on the track map).
 2. Formula 1's own sign-in page opens. **You type your password on formula1.com; PitWall never sees it.**
 3. Once you are signed in, Formula 1 sets a `login-session` cookie. PitWall keeps only the subscription token inside it, encrypted with Windows DPAPI for your user account (`%LOCALAPPDATA%\PitWall\f1tv.token`), and sends it only to `livetiming.formula1.com`.
-4. Tokens last about a week. When one expires, the top bar says so and timing carries on without it.
+4. Tokens last about a week. When one expires the top bar says so, and the sign-in pop-up reappears; until you sign in again Formula 1 serves no timing at all.
 
 For a headless server you can pass the cookie value or the token in the `PITWALL_F1TV_TOKEN` environment variable instead. The repository contains no credentials of any kind.
 
@@ -83,7 +83,7 @@ The video usually runs 20–60 seconds behind the timing feed. Set the delay in 
 
 ### Replay
 
-Any completed session in Formula 1's public archive can be replayed at 1–30× with seeking: pick the season, Grand Prix and session in the controls drawer. It is the quickest way to try PitWall between race weekends, and it shows positions and telemetry even without F1 TV, because the archive includes them once a session is over.
+Any completed session in Formula 1's archive can be replayed at 1–30× with seeking: pick the season, Grand Prix and session in the controls drawer. It is the quickest way to try PitWall between race weekends, and a session replays with full positions and telemetry. Downloading one needs a connected F1 TV account (the archive moved behind the paywall in October 2026); sessions already downloaded stay in `%LOCALAPPDATA%\PitWallrchive` and replay offline.
 
 ## Architecture
 

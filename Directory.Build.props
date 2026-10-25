@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Authors>Juan Andres Rodriguez</Authors>
     <Product>PitWall</Product>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Copyright>Copyright (c) 2026 Juan Andres Rodriguez</Copyright>
     <InvariantGlobalization>true</InvariantGlobalization>
     <DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>

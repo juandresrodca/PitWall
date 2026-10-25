@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 using PitWall.Core.Json;
 using PitWall.Core.LiveTiming;
+using PitWall.Server.Auth;
 
 namespace PitWall.Server.Archive;
 
@@ -19,14 +22,36 @@ public sealed record ArchiveSession(
     int CircuitKey);
 
 /// <summary>
-/// Reads Formula 1's public timing archive (livetiming.formula1.com/static). Completed
-/// sessions are cached on disk because they never change and some streams are ~10 MB.
+/// Reads Formula 1's timing archive (livetiming.formula1.com/static). Completed sessions are
+/// cached on disk because they never change and some streams are ~10 MB.
 /// </summary>
-public sealed class ArchiveClient(HttpClient http, PitWallOptions options)
+/// <remarks>
+/// Since 15 October 2026 the archive is behind the F1 TV paywall: without a subscription token
+/// every file answers 401. Requests therefore carry the saved token, and a 401 is reported as
+/// "sign in", not as "this session has no data" — sessions already cached still replay offline.
+/// </remarks>
+public sealed class ArchiveClient(HttpClient http, TokenStore tokens, PitWallOptions options)
 {
     public const string BaseUrl = "https://livetiming.formula1.com/static/";
 
     private readonly ConcurrentDictionary<int, (DateTimeOffset Fetched, IReadOnlyList<ArchiveSession> Sessions)> _seasons = new();
+
+    /// <summary>True when Formula 1 last answered 401: the archive needs an F1 TV sign-in.</summary>
+    public bool NeedsSignIn { get; private set; }
+
+    /// <summary>GET with the F1 TV token attached, and 401 remembered for the UI.</summary>
+    private async Task<HttpResponseMessage> GetAsync(string url, CancellationToken cancellation)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (tokens.UsableToken(DateTimeOffset.UtcNow) is { } token)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        var response = await http.SendAsync(request, cancellation);
+        NeedsSignIn = response.StatusCode == HttpStatusCode.Unauthorized;
+        return response;
+    }
 
     public async Task<IReadOnlyList<ArchiveSession>> GetSeasonAsync(int year, CancellationToken cancellation)
     {
@@ -35,7 +60,7 @@ public sealed class ArchiveClient(HttpClient http, PitWallOptions options)
             return cached.Sessions;
         }
 
-        using var response = await http.GetAsync($"{BaseUrl}{year}/Index.json", cancellation);
+        using var response = await GetAsync($"{BaseUrl}{year}/Index.json", cancellation);
         if (!response.IsSuccessStatusCode)
         {
             return cached.Sessions ?? [];
@@ -102,7 +127,7 @@ public sealed class ArchiveClient(HttpClient http, PitWallOptions options)
         }
         else
         {
-            using var response = await http.GetAsync($"{BaseUrl}{sessionPath}{topic}.jsonStream", cancellation);
+            using var response = await GetAsync($"{BaseUrl}{sessionPath}{topic}.jsonStream", cancellation);
             if (!response.IsSuccessStatusCode)
             {
                 return [];

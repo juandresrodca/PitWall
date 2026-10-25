@@ -197,7 +197,7 @@ internal sealed class LoginForm : Form
         {
             // Signed in, but Formula 1 issued no subscription token: an account without F1 TV.
             Result = LoginResult.NoSubscription;
-            SetStatus("Signed in, but this account has no F1 TV subscription. Timing still works without it.", Amber);
+            SetStatus("Signed in, but this account has no F1 TV subscription. Formula 1 now requires one for live timing.", Amber);
             _cancel.Text = "Close";
             return;
         }

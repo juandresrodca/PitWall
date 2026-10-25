@@ -313,7 +313,7 @@ public sealed class PitWallServer : IAsyncDisposable
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
         };
         var http = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(2) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("PitWall/0.2 (+https://github.com/juandresrodca/PitWall)");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd(HttpDefaults.UserAgent);
         return http;
     }
 

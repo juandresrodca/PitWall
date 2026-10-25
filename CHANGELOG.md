@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.1 — 2026-10-25
+
+Formula 1 put live timing and the session archive behind the F1 TV paywall on 15 October 2026.
+PitWall stopped working that day; these are the fixes.
+
+- **Live timing reconnects again.** The SignalR client's own requests were answered with
+  CloudFront 403 because they carried no product identity; PitWall now names itself on the
+  negotiate request and the websocket, as it already did on every other call.
+- **The archive is sent the F1 TV token.** Schedules, replays and track maps fetch
+  `livetiming.formula1.com/static`, which now answers 401 without a subscription. They were
+  failing silently and looking like empty sessions.
+- **A rejected token is no longer dropped.** The old behaviour fell back to the public feed for
+  the rest of the run, which now carries nothing — and it stayed in that state until restart.
+  401 (sign in again) and 403 (network refused) are told apart and explained.
+- A second `--headless` run says PitWall is already running instead of exiting silently.
+- SignalR packages 10.0.12 → 10.0.14 (CVE-2026-70159, high severity).
+- Copy throughout no longer claims timing works without an F1 TV subscription.
+
 ## 0.2.0 — 2026-09-11
 
 - **Connect F1 TV pop-up** in the dashboard: explains what the subscription unlocks, opens the sign-in

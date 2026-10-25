@@ -57,7 +57,9 @@ public sealed class ReplaySource(FeedHub hub, ArchiveClient archive, ILogger<Rep
         _timeline = ReplayTimeline.Create(all.SelectMany(l => l));
         if (_timeline.Lines.Count == 0)
         {
-            PublishStatus(FeedConnection.Error, "That session has no archived timing data.", 0);
+            PublishStatus(FeedConnection.Error, archive.NeedsSignIn
+                ? "Formula 1 now requires an F1 TV sign-in to download past sessions."
+                : "That session has no archived timing data.", 0);
             return;
         }
 

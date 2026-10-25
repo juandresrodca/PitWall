@@ -13,7 +13,8 @@ namespace PitWall.Server.Feed;
 /// </summary>
 /// <remarks>
 /// With an F1 TV token the feed also serves car positions and telemetry. If the token is
-/// refused the source reconnects without it rather than going dark: timing still works.
+/// Since October 2026 Formula 1 serves the feed only to subscribers, so the token is kept
+/// through refusals rather than dropped: without it there is nothing left to fall back to.
 /// </remarks>
 public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<LiveTimingSource> logger) : IAsyncDisposable
 {
@@ -23,7 +24,6 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
     private Task? _loop;
     private TaskCompletionSource _restart = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private string? _loadedPath;
-    private bool _tokenRefused;
 
     public void Start()
     {
@@ -33,7 +33,6 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
         }
 
         _run = new CancellationTokenSource();
-        _tokenRefused = false;
         hub.SessionChanged += OnSessionChanged;
         tokens.Changed += OnTokenChanged;
         _loop = Task.Run(() => RunAsync(_run.Token));
@@ -71,11 +70,7 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
         }
     }
 
-    private void OnTokenChanged(Core.Auth.F1TvToken? token)
-    {
-        _tokenRefused = false;
-        _restart.TrySetResult();
-    }
+    private void OnTokenChanged(Core.Auth.F1TvToken? token) => _restart.TrySetResult();
 
     private async Task RunAsync(CancellationToken cancellation)
     {
@@ -83,7 +78,7 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
         while (!cancellation.IsCancellationRequested)
         {
             _restart = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var token = _tokenRefused ? null : tokens.UsableToken(DateTimeOffset.UtcNow);
+            var token = tokens.UsableToken(DateTimeOffset.UtcNow);
             PublishAuth(token is not null);
 
             hub.UpdateStatus(s => s with
@@ -91,7 +86,7 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
                 Source = FeedSource.Live,
                 Replay = null,
                 Connection = attempt == 0 ? FeedConnection.Connecting : FeedConnection.Reconnecting,
-                Message = token is null ? "Public timing feed" : "F1 TV timing feed",
+                Message = token is null ? "Connecting without an F1 TV sign-in" : "F1 TV timing feed",
             });
 
             await using var connection = Build(token);
@@ -123,7 +118,7 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
                 hub.Load(snapshot);
                 attempt = 0;
 
-                hub.UpdateStatus(s => s with { Connection = FeedConnection.Connected, Message = token is null ? "Public timing feed" : "F1 TV timing feed" });
+                hub.UpdateStatus(s => s with { Connection = FeedConnection.Connected, Message = token is null ? "Timing feed, no F1 TV sign-in" : "F1 TV timing feed" });
                 logger.LogInformation("Live timing connected ({Mode})", token is null ? "public" : "F1 TV");
 
                 using var clock = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -138,12 +133,30 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
             {
                 break;
             }
-            catch (HttpRequestException ex) when (token is not null && ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized)
             {
-                logger.LogWarning("F1 TV token refused by the timing feed; continuing without it");
-                _tokenRefused = true;
-                PublishAuth(false, "Formula 1 refused the saved F1 TV sign-in. Sign in again to restore car positions.");
-                continue;
+                // Since October 2026 the feed itself is behind the F1 TV paywall, so dropping the
+                // token would leave nothing to show. Keep it and tell the user to sign in again.
+                logger.LogWarning("Timing feed rejected the sign-in (401)");
+                PublishAuth(false, token is null
+                    ? "Formula 1 now requires an F1 TV sign-in for live timing."
+                    : "Formula 1 rejected the saved F1 TV sign-in. Sign in again.");
+                hub.UpdateStatus(s => s with
+                {
+                    Connection = FeedConnection.Error,
+                    Message = token is null ? "Live timing needs an F1 TV sign-in" : "F1 TV sign-in rejected — sign in again",
+                });
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Forbidden)
+            {
+                // CloudFront refuses the request before Formula 1 ever sees the token: a blocked
+                // network (VPN, datacentre, some mobile carriers) rather than a sign-in problem.
+                logger.LogWarning("Timing feed refused the connection (403)");
+                hub.UpdateStatus(s => s with
+                {
+                    Connection = FeedConnection.Error,
+                    Message = "Formula 1 is refusing this network. A VPN or hotspot usually causes this.",
+                });
             }
             catch (Exception ex)
             {
@@ -190,7 +203,7 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
         }
     }
 
-    private HubConnection Build(string? token) =>
+    private static HubConnection Build(string? token) =>
         new HubConnectionBuilder()
             .WithUrl(HubUrl, options =>
             {
@@ -198,6 +211,12 @@ public sealed class LiveTimingSource(FeedHub hub, TokenStore tokens, ILogger<Liv
                 {
                     options.AccessTokenProvider = () => Task.FromResult<string?>(token);
                 }
+
+                // Formula 1's CDN answers 403 to the SignalR client's default headers. Naming
+                // ourselves on the negotiate request and on the socket gets a normal response.
+                options.Headers["User-Agent"] = HttpDefaults.UserAgent;
+                options.WebSocketConfiguration = socket =>
+                    socket.SetRequestHeader("User-Agent", HttpDefaults.UserAgent);
             })
             .Build();
 

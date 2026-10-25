@@ -100,7 +100,9 @@ Windows may show **"Windows protected your PC"** the first time, because the exe
 | *PitWall is already running* | It lives in the tray (next to the clock). Use **Show dashboard** or **Exit PitWall**. |
 | Dashboard says it has not been built | You ran `dotnet build` without building `web/` first. Use `build.cmd`. |
 | Video plays audio but a black picture | Set the video player to *Microsoft Edge* in **Screen setup…** (the embedded window can't play every DRM stream). |
-| Sign-in pop-up says *no subscription* | Formula 1 only issues the token to F1 TV Access/Pro accounts. Timing still works without it. |
+| Sign-in pop-up says *no subscription* | Formula 1 only issues the token to F1 TV Access/Pro accounts, and since 15 Oct 2026 live timing needs one. |
+| *Live timing needs an F1 TV sign-in* | Your token expired (they last about a week). Open the pop-up and sign in again. |
+| *Formula 1 is refusing this network* | Their CDN blocks VPNs, datacentres and some mobile hotspots. Use a normal home connection. |
 | Port 5320 in use | PitWall picks the next free port automatically; for `--headless`, pass `--port`. |
 
 Settings, caches and the sealed F1 TV token live in `%LOCALAPPDATA%\PitWall`. Sign out from the pop-up or the

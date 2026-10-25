@@ -137,9 +137,9 @@
       {#if view === 'problem'}
         <p class="alert">{auth.problem}</p>
       {:else if view === 'no-subscription'}
-        <p class="alert">You signed in, but Formula 1 didn't issue an F1 TV subscription for that account. Timing still works; car positions and telemetry need F1 TV Access or Pro.</p>
+        <p class="alert">You signed in, but Formula 1 didn't issue an F1 TV subscription for that account. Since October 2026 live timing needs F1 TV Access or Pro; without it PitWall can only replay sessions you already downloaded.</p>
       {:else}
-        <p class="lead">Since 2025 Formula 1 streams some live data only to subscribers. Connect once and PitWall unlocks:</p>
+        <p class="lead">Since October 2026 Formula 1 serves live timing only to subscribers. Connect once and PitWall unlocks:</p>
       {/if}
 
       <ul class="unlocks">

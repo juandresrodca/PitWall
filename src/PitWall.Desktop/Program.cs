@@ -32,7 +32,13 @@ internal static class Program
         using var single = new Mutex(true, @"Local\PitWall.SingleInstance", out var first);
         if (!first)
         {
-            if (!headless)
+            if (headless)
+            {
+                // Without this a second --headless run just exits, looking like a crash.
+                NativeMethods.AttachConsole(NativeMethods.AttachParentProcess);
+                Console.Error.WriteLine("PitWall is already running. Exit it from its tray icon, or stop the other --headless run, first.");
+            }
+            else
             {
                 MessageBox.Show("PitWall is already running. Look for its icon in the notification area.",
                     "PitWall", MessageBoxButtons.OK, MessageBoxIcon.Information);
