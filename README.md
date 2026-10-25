@@ -61,6 +61,7 @@ Download `PitWall.exe` from the [latest CI build](https://github.com/juandresrod
 PitWall.exe                 dashboard + live video on two screens
 PitWall.exe --setup         choose the screens again
 PitWall.exe --connect       open the F1 TV sign-in pop-up straight away
+PitWall.exe --update        install the newest release, then exit
 PitWall.exe --headless      only the dashboard server; open http://127.0.0.1:5320 in any browser
 PitWall.exe --replay PATH   start by replaying an archived session
 PitWall.exe --port N        dashboard port (default 5320)

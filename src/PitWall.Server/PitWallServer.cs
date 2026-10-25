@@ -321,7 +321,8 @@ public sealed class PitWallServer : IAsyncDisposable
         }
     }
 
-    private static HttpClient CreateHttpClient()
+    /// <summary>The HTTP client every PitWall request goes through, identity and all.</summary>
+    public static HttpClient CreateHttpClient()
     {
         var handler = new SocketsHttpHandler
         {

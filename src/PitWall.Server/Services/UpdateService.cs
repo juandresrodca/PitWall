@@ -218,7 +218,8 @@ public sealed class UpdateService(HttpClient http, ILogger<UpdateService> logger
     /// Hands the swap to a detached script. Returns true when it started, meaning the caller
     /// should now exit so the file can be replaced.
     /// </summary>
-    public bool StartInstall(IEnumerable<string>? restartArgs = null)
+    /// <param name="restart">Start the new PitWall afterwards. False leaves it installed only.</param>
+    public bool StartInstall(IEnumerable<string>? restartArgs = null, bool restart = true)
     {
         if (_status.State != UpdateState.Ready || _readyFile is null || InstalledExePath() is not { } target)
         {
@@ -226,7 +227,7 @@ public sealed class UpdateService(HttpClient http, ILogger<UpdateService> logger
         }
 
         var script = Path.Combine(Path.GetTempPath(), $"pitwall-update-{Guid.NewGuid():N}.ps1");
-        File.WriteAllText(script, InstallScript(target, _readyFile, Environment.ProcessId, restartArgs), new UTF8Encoding(false));
+        File.WriteAllText(script, InstallScript(target, _readyFile, Environment.ProcessId, restartArgs, restart), new UTF8Encoding(false));
 
         var start = new ProcessStartInfo("powershell.exe")
         {
@@ -253,12 +254,13 @@ public sealed class UpdateService(HttpClient http, ILogger<UpdateService> logger
         }
     }
 
-    private static string InstallScript(string target, string staged, int processId, IEnumerable<string>? restartArgs)
+    private static string InstallScript(string target, string staged, int processId, IEnumerable<string>? restartArgs, bool restart)
     {
         var arguments = (restartArgs ?? []).Select(Quote).ToList();
-        var restart = arguments.Count > 0
-            ? $"Start-Process -FilePath $target -ArgumentList {string.Join(", ", arguments)}"
-            : "Start-Process -FilePath $target";
+        var relaunch = !restart ? string.Empty
+            : arguments.Count > 0
+                ? $"Start-Process -FilePath $target -ArgumentList {string.Join(", ", arguments)}"
+                : "Start-Process -FilePath $target";
 
         // A plain raw string with placeholders: PowerShell's braces would otherwise collide
         // with C# interpolation. Renaming the old exe aside comes first because Windows allows
@@ -296,7 +298,7 @@ public sealed class UpdateService(HttpClient http, ILogger<UpdateService> logger
             .Replace("__TARGET__", Quote(target))
             .Replace("__STAGED__", Quote(staged))
             .Replace("__PID__", processId.ToString(System.Globalization.CultureInfo.InvariantCulture))
-            .Replace("__RESTART__", restart);
+            .Replace("__RESTART__", relaunch);
     }
 
     private async Task<string?> ExpectedHashAsync(CancellationToken cancellation)

@@ -55,6 +55,7 @@ Pick one:
 .\dist\PitWall.exe                 # dashboard + live video on two screens
 .\dist\PitWall.exe --setup         # choose which screen shows what, again
 .\dist\PitWall.exe --connect       # open the F1 TV sign-in pop-up straight away
+.\dist\PitWall.exe --update        # install the newest release, then exit
 .\dist\PitWall.exe --headless      # only the dashboard server: open http://127.0.0.1:5320 in any browser
 .\dist\PitWall.exe --replay 2026/2026-09-06_Italian_Grand_Prix/2026-09-06_Race/
 .\dist\PitWall.exe --port 5400     # if 5320 is taken

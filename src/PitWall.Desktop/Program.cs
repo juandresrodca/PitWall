@@ -1,4 +1,7 @@
+using System.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using PitWall.Server;
+using PitWall.Server.Services;
 
 namespace PitWall.Desktop;
 
@@ -10,6 +13,7 @@ internal static class Program
           PitWall.exe                 dashboard + live video on two screens
           PitWall.exe --setup         choose screens again before starting
           PitWall.exe --connect       open the F1 TV sign-in pop-up straight away
+          PitWall.exe --update        install the newest release, then exit
           PitWall.exe --headless      run only the dashboard server (open it in any browser)
           PitWall.exe --replay PATH   start by replaying an archived session, e.g.
                                       2026/2026-09-06_Italian_Grand_Prix/2026-09-06_Race/
@@ -21,7 +25,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        var options = ParseArgs(args, out var headless, out var setup, out var help, out var connect);
+        var options = ParseArgs(args, out var headless, out var setup, out var help, out var connect, out var update);
         if (help)
         {
             NativeMethods.AttachConsole(NativeMethods.AttachParentProcess);
@@ -46,7 +50,57 @@ internal static class Program
             return 1;
         }
 
+        if (update)
+        {
+            return RunUpdate();
+        }
+
         return headless ? RunHeadless(options) : RunDesktop(options, setup, connect);
+    }
+
+    /// <summary>Installs the newest release from the command line and exits.</summary>
+    private static int RunUpdate()
+    {
+        NativeMethods.AttachConsole(NativeMethods.AttachParentProcess);
+        using var http = PitWallServer.CreateHttpClient();
+        var updates = new UpdateService(http, NullLogger<UpdateService>.Instance);
+
+        var status = updates.CheckAsync(force: true, CancellationToken.None).GetAwaiter().GetResult();
+        Console.WriteLine();
+        switch (status.State)
+        {
+            case UpdateState.UpToDate:
+                Console.WriteLine($"PitWall {status.Current} is the newest release.");
+                return 0;
+            case UpdateState.Available:
+                break;
+            default:
+                Console.Error.WriteLine(status.Error ?? "Could not check for updates.");
+                return 1;
+        }
+
+        Console.WriteLine($"Downloading PitWall {status.Latest} (you have {status.Current})…");
+        status = updates.DownloadAsync(CancellationToken.None).GetAwaiter().GetResult();
+        if (status.State != UpdateState.Ready)
+        {
+            Console.Error.WriteLine(status.Error ?? "The update could not be downloaded.");
+            return 1;
+        }
+
+        if (Process.GetProcessesByName("PitWall").Length > 1)
+        {
+            Console.Error.WriteLine("PitWall is running. Exit it from its tray icon, then run this again.");
+            return 1;
+        }
+
+        if (!updates.StartInstall(restart: false))
+        {
+            Console.Error.WriteLine("Could not start the installer.");
+            return 1;
+        }
+
+        Console.WriteLine($"Installing {status.Latest}. It will be in place in a moment.");
+        return 0;
     }
 
     private static int RunHeadless(PitWallOptions options)
@@ -122,10 +176,10 @@ internal static class Program
         return 0;
     }
 
-    private static PitWallOptions ParseArgs(string[] args, out bool headless, out bool setup, out bool help, out bool connect)
+    private static PitWallOptions ParseArgs(string[] args, out bool headless, out bool setup, out bool help, out bool connect, out bool update)
     {
         var options = new PitWallOptions();
-        headless = setup = help = connect = false;
+        headless = setup = help = connect = update = false;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i].ToLowerInvariant())
@@ -133,6 +187,7 @@ internal static class Program
                 case "--headless": headless = true; break;
                 case "--setup": setup = true; break;
                 case "--connect": connect = true; break;
+                case "--update": update = true; break;
                 case "--lan": options.AllowLan = true; break;
                 case "--replay" when i + 1 < args.Length: options.ReplayPath = args[++i]; break;
                 case "--webroot" when i + 1 < args.Length: options.WebRoot = args[++i]; break;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 — 2026-10-25
+
+- `PitWall.exe --update` installs the newest release from the command line, for headless setups
+  and scripts. The tray and the controls drawer already did this with a dialog.
+
 ## 0.2.2 — 2026-10-25
 
 - **The track map no longer gets stuck empty.** The dashboard gave up asking for the circuit
